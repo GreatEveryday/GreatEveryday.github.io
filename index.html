@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MBTI 人格测试</title>
+    <!-- 引入 Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 使用 Inter 字体作为默认，并回退到系统无衬线字体 */
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+        }
+        /* 自定义滚动条样式，使其在不同浏览器上看起来更好 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1; /* slate-300 */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background-color: #f1f5f9; /* slate-100 */
+        }
+        /* 隐藏原生 radio input 但保持可点击区域 */
+        .radio-label input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .radio-tile {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+            user-select: none;
+            border: 2px solid transparent;
+        }
+        /* 选中时的样式 */
+        .radio-label input:checked + .radio-tile {
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+            border-color: #1d4ed8; /* blue-700 */
+            transform: scale(1.05);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        /* 进度条样式 */
+        #progress-bar {
+            height: 10px;
+            background-color: #d1d5db; /* gray-300 */
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        #progress-indicator {
+            height: 100%;
+            background-color: #2563eb; /* blue-600 */
+            transition: width 0.3s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col items-center p-4">
+
+    <!-- 主容器 -->
+    <div id="main-container" class="w-full max-w-4xl bg-white shadow-2xl rounded-xl p-6 md:p-10 my-8">
+
+        <h1 class="text-4xl font-extrabold text-gray-900 mb-2 text-center">MBTI 人格倾向性测试</h1>
+        <p class="text-lg text-gray-500 mb-8 text-center border-b pb-4">请根据您的真实感受，选择最符合您情况的选项 (共 50 题)</p>
+
+        <!-- 1. 开始界面 -->
+        <div id="start-screen" class="text-center py-20">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-blue-500 mx-auto mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <h2 class="text-3xl font-bold text-gray-800 mb-4">准备好了解真实的自己了吗？</h2>
+            <p class="text-gray-600 mb-8">本测试包含 50 道问题，旨在帮助您发现您的人格类型和偏好维度。</p>
+            <button onclick="startTest()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-10 rounded-full transition duration-300 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-300">
+                开始测试
+            </button>
+        </div>
+
+        <!-- 2. 测试内容区域 (默认隐藏) -->
+        <div id="test-content" class="hidden">
+            <!-- 进度条 -->
+            <div id="progress-bar" class="mb-8">
+                <div id="progress-indicator" style="width: 0%;"></div>
+            </div>
+
+            <!-- 单个问题渲染区域 -->
+            <div id="question-container" class="space-y-8">
+                <!-- 单个问题将由 JavaScript 渲染到这里 -->
+            </div>
+
+            <!-- 导航按钮 -->
+            <div class="mt-10">
+                <div class="flex items-center space-x-4">
+                    <button id="prev-button" onclick="previousQuestion()" class="flex-shrink-0 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-3 px-6 rounded-full transition duration-300 shadow-lg focus:outline-none focus:ring-4 focus:ring-gray-300 hidden">
+                        上一题
+                    </button>
+                    <button id="next-button" onclick="nextQuestion()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full transition duration-300 shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-300">
+                        下一题
+                    </button>
+                </div>
+                <p id="error-message" class="text-red-600 text-center font-medium mt-4 hidden"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 结果付费墙/覆盖层 -->
+    <div id="payment-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-80 backdrop-blur-sm z-50 items-center justify-center hidden">
+        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-lg w-11/12 transform transition-all duration-300 scale-100">
+            <div class="text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-yellow-500 mx-auto mb-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1h2a2 2 0 012 2v2h1a1 1 0 010 2h-1v2h1a1 1 0 010 2h-1v1a2 2 0 01-2 2h-2v1a1 1 0 11-2 0v-1H7a2 2 0 01-2-2v-1h1a1 1 0 010-2H5v-2h1a1 1 0 010-2H5V6a2 2 0 012-2h2V3a1 1 0 011-1zM7 6h6v4H7V6zm6 6H7v2h6v-2z" clip-rule="evenodd" />
+                </svg>
+                <h2 class="text-3xl font-bold text-gray-900 mb-3">恭喜您，测试完成！</h2>
+                <p class="text-gray-600 mb-6">您的专属 MBTI 人格分析报告已生成，但尚未解锁。</p>
+                <p class="text-2xl font-extrabold text-blue-600 mb-6">¥ 9.90 解锁完整报告</p>
+            </div>
+
+            <button onclick="simulatePayment()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg transition duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-green-300">
+                立即充值 9.90 元解锁
+            </button>
+
+            <p class="text-xs text-gray-400 mt-4">（本页面仅为功能演示，点击按钮将直接模拟“支付成功”并显示结果）</p>
+        </div>
+    </div>
+
+    <!-- 结果显示区域 -->
+    <div id="result-display" class="w-full max-w-4xl bg-white shadow-2xl rounded-xl p-6 md:p-10 my-8 hidden">
+        <h2 class="text-4xl font-extrabold text-center text-blue-600 mb-6">🎉 您的 MBTI 报告已解锁！</h2>
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-6 rounded-lg mb-8">
+            <h3 class="text-xl font-semibold text-blue-800 mb-2">人格类型：</h3>
+            <p id="mbti-type" class="text-6xl font-black text-blue-900 tracking-wider">----</p>
+        </div>
+
+        <h3 class="text-2xl font-bold text-gray-800 mb-4">类型描述：</h3>
+        <p id="mbti-description" class="text-gray-700 leading-relaxed text-lg whitespace-pre-line">
+            <!-- 描述将由 JavaScript 填充 -->
+        </p>
+
+        <div class="mt-10 pt-6 border-t border-gray-200">
+            <h3 class="text-xl font-semibold text-gray-800 mb-3">维度分析：</h3>
+            <div id="dimension-analysis" class="space-y-4">
+                <!-- 维度分析将由 JavaScript 填充 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局状态变量
+        let currentQuestionIndex = 0;
+        const userAnswers = {}; // 存储用户答案: { qId: score }
+
+        // MBTI 16 种人格类型的描述 (仅列举部分作为示例)
+        const MBTI_RESULTS = {
+            'ESTJ': { name: '监督者', description: '务实、有条理、注重效率和规则。是天生的组织者和执行者。' },
+            'ESTP': { name: '创业者', description: '精力充沛、活泼，喜欢立即行动，享受当下和物质生活。' },
+            'ESFJ': { name: '执政官', description: '热心、合群、负责任，注重和谐和人际关系，是团队的粘合剂。' },
+            'ESFP': { name: '表演者', description: '外向、乐观、热爱生活和体验新事物，喜欢成为聚光灯的焦点。' },
+            'ENTJ': { name: '指挥官', description: '果断、有远见、战略性强，天生具备领导才能，擅长制定并实施长期计划。' },
+            'ENTP': { name: '辩论家', description: '机智、富有创造力、喜欢挑战现状，享受思想的交锋与探索。' },
+            'ENFJ': { name: '主人公', description: '魅力非凡、富有感染力、理想主义者，擅长激发他人的潜能。' },
+            'ENFP': { name: '竞选者', description: '热情洋溢、充满好奇心、富有想象力，总是能找到生活的乐趣。' },
+            'ISTJ': { name: '物流师', description: '安静、认真、尽责，注重事实和细节，是可靠的基石。' },
+            'ISTP': { name: '鉴赏家', description: '冷静、实际、观察力强，喜欢动手操作和解决实际问题。' },
+            'ISFJ': { name: '保护者', description: '体贴、忠诚、传统，乐于奉献，默默地支持和保护身边的人。' },
+            'ISFP': { name: '探险家', description: '温柔、敏感、喜欢自由和艺术，通过行动和创造来表达自我。' },
+            'INTJ': { name: '建筑师', description: '独立、创新、逻辑严谨，擅长独立思考和设计复杂的系统。' },
+            'INTP': { name: '逻辑学家', description: '求知欲强、喜欢理论、分析能力突出，沉浸在思想的海洋中。' },
+            'INFJ': { name: '提倡者', description: '安静、神秘、理想主义，致力于实现人类的福祉。' },
+            'INFP': { name: '调停者', description: '善良、富有同情心、追求意义和价值，内心世界丰富。' }
+        };
+
+        // 50个测试问题定义
+        // category: E, S, T, J (高分倾向于该字母)
+        const QUESTIONS = [
+            // E/I 12 Questions (Max Score: 12 * 4 = 48. Midpoint 24)
+            { id: 1, text: "在聚会中，您通常是主动和陌生人攀谈的人。", category: 'E' },
+            { id: 2, text: "您更喜欢通过写作或独处来反思和整理思绪。", category: 'E', reverse: true }, // I 倾向，但为了简化评分，统一使用 E/S/T/J 计分，用 reverse 标记
+            { id: 3, text: "当您感到疲倦时，与他人交流会让您感觉充满活力。", category: 'E' },
+            { id: 4, text: "您认为自己是一个“行动派”而不是“思想家”。", category: 'E' },
+            { id: 5, text: "您习惯于将私人生活和工作分开。", category: 'E', reverse: true }, // I 倾向
+            { id: 6, text: "您有很多熟人，但只有少数几个非常亲密的朋友。", category: 'E', reverse: true }, // I 倾向
+            { id: 7, text: "您更喜欢一个由多方讨论共同作出的决定。", category: 'E' },
+            { id: 8, text: "您经常在没有事先准备的情况下直接发言或行动。", category: 'E' },
+            { id: 9, text: "在公共场合，您通常会避免引起别人的注意。", category: 'E', reverse: true }, // I 倾向
+            { id: 10, text: "您认为与他人交流比阅读更能学到东西。", category: 'E' },
+            { id: 11, text: "您更倾向于在安静、独立的办公环境中工作。", category: 'E', reverse: true }, // I 倾向
+            { id: 12, text: "您能轻松地向别人介绍您自己。", category: 'E' },
+
+            // S/N 13 Questions (Max Score: 13 * 4 = 52. Midpoint 26)
+            { id: 13, text: "您更关注事情的实际用途而不是理论上的可能性。", category: 'S' },
+            { id: 14, text: "您喜欢思考抽象的观念和未来的趋势。", category: 'S', reverse: true }, // N 倾向
+            { id: 15, text: "您对细节的关注程度很高，不容易忽略小错误。", category: 'S' },
+            { id: 16, text: "您相信“六感”或直觉能给您带来正确的答案。", category: 'S', reverse: true }, // N 倾向
+            { id: 17, text: "在讲故事时，您倾向于按照事件发生的准确顺序进行。", category: 'S' },
+            { id: 18, text: "您经常沉浸在自己的想象和白日梦中。", category: 'S', reverse: true }, // N 倾向
+            { id: 19, text: "您更喜欢明确的、可衡量的结果，而不是开放式的探索。", category: 'S' },
+            { id: 20, text: "您认为“可能性”比“现实”更有趣。", category: 'S', reverse: true }, // N 倾向
+            { id: 21, text: "您在工作中更喜欢使用经过验证的方法。", category: 'S' },
+            { id: 22, text: "您善于发现事物之间的隐藏联系和深层含义。", category: 'S', reverse: true }, // N 倾向
+            { id: 23, text: "对您来说，眼见为实。", category: 'S' },
+            { id: 24, text: "您认为大多数规则都可以有例外。", category: 'S', reverse: true }, // N 倾向
+            { id: 25, text: "您经常被描述为一个脚踏实地的人。", category: 'S' },
+
+            // T/F 13 Questions (Max Score: 13 * 4 = 52. Midpoint 26)
+            { id: 26, text: "在做决定时，您主要依靠逻辑分析和客观事实。", category: 'T' },
+            { id: 27, text: "您很容易被他人的情绪所感染。", category: 'T', reverse: true }, // F 倾向
+            { id: 28, text: "您认为公正比同情心更重要。", category: 'T' },
+            { id: 29, text: "您会努力避免伤害他人的感受。", category: 'T', reverse: true }, // F 倾向
+            { id: 30, text: "您认为表达自己的愤怒或沮丧是可以接受的。", category: 'T' },
+            { id: 31, text: "您在批评他人时会尽量措辞温和。", category: 'T', reverse: true }, // F 倾向
+            { id: 32, text: "当您需要做选择时，您会列出利弊清单。", category: 'T' },
+            { id: 33, text: "您认为一个好的领导者应该首先具备关怀他人的能力。", category: 'T', reverse: true }, // F 倾向
+            { id: 34, text: "您更容易对与您无关的悲惨事件感到悲伤。", category: 'T', reverse: true }, // F 倾向
+            { id: 35, text: "您通常能保持冷静，不会让情绪影响您的判断。", category: 'T' },
+            { id: 36, text: "您认为坦率直言比顾及面子更重要。", category: 'T' },
+            { id: 37, text: "您经常因为他人的问题而感到压力或烦恼。", category: 'T', reverse: true }, // F 倾向
+            { id: 38, text: "在冲突中，您更倾向于找出谁是正确的，而不是让双方都感到满意。", category: 'T' },
+
+            // J/P 12 Questions (Max Score: 12 * 4 = 48. Midpoint 24)
+            { id: 39, text: "您喜欢事先制定计划，并且尽量按照计划执行。", category: 'J' },
+            { id: 40, text: "您更喜欢在最后一刻做决定，以保持灵活性。", category: 'J', reverse: true }, // P 倾向
+            { id: 41, text: "您对未完成的任务感到不适。", category: 'J' },
+            { id: 42, text: "您很容易被突发奇想吸引，即使这打乱了您的日程。", category: 'J', reverse: true }, // P 倾向
+            { id: 43, text: "您在整理自己的空间和文件方面非常有效率。", category: 'J' },
+            { id: 44, text: "您认为规则和截止日期是灵活的。", category: 'J', reverse: true }, // P 倾向
+            { id: 45, text: "您倾向于尽快完成任务，而不是拖到最后一刻。", category: 'J' },
+            { id: 46, text: "您更喜欢自由和自发性，而不是结构和组织。", category: 'J', reverse: true }, // P 倾向
+            { id: 47, text: "您经常提前很久为度假旅行做详细的安排。", category: 'J' },
+            { id: 48, text: "在旅行中，您喜欢边走边看，而不是提前预定好一切。", category: 'J', reverse: true }, // P 倾向
+            { id: 49, text: "您认为有明确的进度表能让您更高效。", category: 'J' },
+            { id: 50, text: "您很少做待办事项清单（To-Do List）。", category: 'J', reverse: true }, // P 倾向
+        ];
+
+        /**
+         * 启动测试：隐藏开始界面，显示第一个问题
+         */
+        function startTest() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('test-content').classList.remove('hidden');
+            displayQuestion(currentQuestionIndex);
+        }
+
+        /**
+         * 渲染当前索引的问题到界面
+         * @param {number} index - 当前问题在 QUESTIONS 数组中的索引
+         */
+        function displayQuestion(index) {
+            const container = document.getElementById('question-container');
+            const q = QUESTIONS[index];
+            const questionNumber = index + 1;
+            const totalQuestions = QUESTIONS.length;
+            const fieldName = `q${q.id}`;
+            const isLastQuestion = index === totalQuestions - 1;
+            const isFirstQuestion = index === 0;
+
+            // 1. 更新按钮文本和可见性
+            const nextButton = document.getElementById('next-button');
+            const prevButton = document.getElementById('prev-button');
+            
+            nextButton.textContent = isLastQuestion ? '提交答案并查看报告' : '下一题';
+
+            // 控制上一题按钮的可见性
+            if (isFirstQuestion) {
+                prevButton.classList.add('hidden');
+                // 让下一题按钮独占宽度
+                nextButton.classList.remove('flex-grow');
+                nextButton.classList.add('w-full');
+            } else {
+                prevButton.classList.remove('hidden');
+                // 恢复 flex 布局下的宽度管理
+                nextButton.classList.remove('w-full');
+                nextButton.classList.add('flex-grow');
+            }
+
+            // 2. 更新进度条
+            const progress = ((index + 1) / totalQuestions) * 100;
+            document.getElementById('progress-indicator').style.width = `${progress}%`;
+
+            // 3. 渲染单个问题
+            let html = `
+                <div class="p-6 bg-white border border-gray-200 rounded-xl shadow-lg transition duration-300">
+                    <p class="text-2xl font-semibold mb-4 text-gray-800">
+                        <span class="text-blue-600 font-bold">${questionNumber}/${totalQuestions}.</span> ${q.text}
+                    </p>
+                    <div class="flex flex-col sm:flex-row justify-between space-y-3 sm:space-y-0 sm:space-x-3 text-sm text-center mt-6">
+                        
+                        <!-- 选项：1分 (非常不同意) -->
+                        <label class="radio-label flex-1">
+                            <input type="radio" name="${fieldName}" value="1" required>
+                            <div class="radio-tile p-3 rounded-lg bg-red-50 text-red-700 hover:bg-red-100">
+                                <span class="font-medium">1 - 非常不同意</span>
+                            </div>
+                        </label>
+
+                        <!-- 选项：2分 (不同意) -->
+                        <label class="radio-label flex-1">
+                            <input type="radio" name="${fieldName}" value="2" required>
+                            <div class="radio-tile p-3 rounded-lg bg-yellow-50 text-yellow-700 hover:bg-yellow-100">
+                                <span class="font-medium">2 - 不同意</span>
+                            </div>
+                        </label>
+
+                        <!-- 选项：3分 (中立/不好说) -->
+                        <label class="radio-label flex-1">
+                            <input type="radio" name="${fieldName}" value="3" required>
+                            <div class="radio-tile p-3 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">
+                                <span class="font-medium">3 - 中立</span>
+                            </div>
+                        </label>
+                        
+                        <!-- 选项：4分 (同意) -->
+                        <label class="radio-label flex-1">
+                            <input type="radio" name="${fieldName}" value="4" required>
+                            <div class="radio-tile p-3 rounded-lg bg-green-50 text-green-700 hover:bg-green-100">
+                                <span class="font-medium">4 - 同意</span>
+                            </div>
+                        </label>
+
+                        <!-- 选项：5分 (非常同意) -->
+                        <label class="radio-label flex-1">
+                            <input type="radio" name="${fieldName}" value="5" required>
+                            <div class="radio-tile p-3 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100">
+                                <span class="font-medium">5 - 非常同意</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            `;
+            container.innerHTML = html;
+
+            // 如果用户之前回答过，则重新选中答案
+            const storedAnswer = userAnswers[q.id];
+            if (storedAnswer) {
+                const checkedRadio = document.querySelector(`input[name="${fieldName}"][value="${storedAnswer}"]`);
+                if (checkedRadio) {
+                    checkedRadio.checked = true;
+                }
+            }
+        }
+        
+        /**
+         * 处理返回上一题
+         */
+        function previousQuestion() {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                displayQuestion(currentQuestionIndex);
+                document.getElementById('main-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        /**
+         * 处理下一题或提交答案
+         */
+        function nextQuestion() {
+            const q = QUESTIONS[currentQuestionIndex];
+            const fieldName = `q${q.id}`;
+            // 确保我们从当前渲染的问题容器中获取选定的答案
+            const selected = document.querySelector(`#question-container input[name="${fieldName}"]:checked`);
+            const errorMsg = document.getElementById('error-message');
+
+            if (!selected) {
+                errorMsg.textContent = `请选择您的答案后再继续。`;
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+
+            errorMsg.classList.add('hidden');
+            
+            // 1. 存储答案
+            userAnswers[q.id] = parseInt(selected.value);
+
+            // 2. 检查是否完成
+            if (currentQuestionIndex < QUESTIONS.length - 1) {
+                // 未完成：切换到下一题
+                currentQuestionIndex++;
+                displayQuestion(currentQuestionIndex);
+                // 滚动到顶部以确保用户看到新问题
+                document.getElementById('main-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                // 已完成：显示付费墙 (只在最后一题提交后出现)
+                showPaymentOverlay();
+            }
+        }
+
+        /**
+         * 显示付费墙覆盖层
+         */
+        function showPaymentOverlay() {
+             // 确保在显示付费墙时，测试内容区域被隐藏
+             document.getElementById('main-container').classList.add('hidden');
+             document.getElementById('payment-overlay').classList.remove('hidden');
+             document.getElementById('payment-overlay').classList.add('flex'); // 确保 flex 布局显示
+        }
+
+        /**
+         * 模拟充值成功并显示结果
+         */
+        function simulatePayment() {
+            // 模拟支付过程中的加载状态 (可选)
+            const paymentButton = document.querySelector('#payment-overlay button');
+            paymentButton.textContent = "正在处理支付...";
+            paymentButton.disabled = true;
+            paymentButton.classList.remove('bg-green-500', 'hover:bg-green-600');
+            paymentButton.classList.add('bg-gray-400', 'cursor-not-allowed');
+
+            setTimeout(() => {
+                // 1. 隐藏付费墙
+                document.getElementById('payment-overlay').classList.add('hidden');
+                document.getElementById('payment-overlay').classList.remove('flex');
+
+                // 2. 计算结果
+                const mbtiType = calculateResult();
+
+                // 3. 渲染结果
+                displayResult(mbtiType);
+
+                // 4. 显示结果区域
+                document.getElementById('result-display').classList.remove('hidden');
+
+                // 滚动到顶部以显示结果
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            }, 1500); // 模拟 1.5 秒的支付处理时间
+        }
+
+        /**
+         * 实际计算 MBTI 结果的函数
+         */
+        function calculateResult() {
+            const scores = { E: 0, S: 0, T: 0, J: 0 };
+            const counts = { E: 0, S: 0, T: 0, J: 0 };
+            
+            // 遍历所有问题答案
+            QUESTIONS.forEach(q => {
+                const value = userAnswers[q.id]; // 从存储的答案中获取分数 (1-5)
+                
+                if (value !== undefined) {
+                    let scoreToAdd;
+                    
+                    // 如果问题是反向计分的 (如 I/N/F/P 倾向的问题)
+                    if (q.reverse) {
+                        // 1->4, 2->3, 3->2, 4->1, 5->0。这样高分(5)反而给 E/S/T/J 倾向的分数更低
+                        scoreToAdd = 5 - value; 
+                    } else {
+                        // 1->0, 2->1, 3->2, 4->3, 5->4。值越大，越倾向于字母定义 (E, S, T, J)
+                        scoreToAdd = value - 1; 
+                    }
+                    
+                    scores[q.category] += scoreToAdd; 
+                    counts[q.category] = (counts[q.category] || 0) + 1; // 统计该维度有多少题
+                }
+            });
+
+            // 确定每个维度的类型
+            let mbti = '';
+
+            // E/I 维度: E 越高，I 越低。判断总得分 vs 中位数
+            const totalEQuestions = QUESTIONS.filter(q => q.category === 'E').length;
+            const thresholdE = totalEQuestions * 4 / 2; // 总分 48，阈值 24
+            mbti += scores['E'] >= thresholdE ? 'E' : 'I';
+
+            // S/N 维度: S 越高，N 越低
+            const totalSQuestions = QUESTIONS.filter(q => q.category === 'S').length;
+            const thresholdS = totalSQuestions * 4 / 2; // 总分 52，阈值 26
+            mbti += scores['S'] >= thresholdS ? 'S' : 'N';
+
+            // T/F 维度: T 越高，F 越低
+            const totalTQuestions = QUESTIONS.filter(q => q.category === 'T').length;
+            const thresholdT = totalTQuestions * 4 / 2; // 总分 52，阈值 26
+            mbti += scores['T'] >= thresholdT ? 'T' : 'F';
+
+            // J/P 维度: J 越高，P 越低
+            const totalJQuestions = QUESTIONS.filter(q => q.category === 'J').length;
+            const thresholdJ = totalJQuestions * 4 / 2; // 总分 48，阈值 24
+            mbti += scores['J'] >= thresholdJ ? 'J' : 'P';
+
+            // 附带详细分数信息
+            return {
+                type: mbti,
+                rawScores: scores,
+                maxScores: { E: totalEQuestions * 4, S: totalSQuestions * 4, T: totalTQuestions * 4, J: totalJQuestions * 4 },
+                counts: counts
+            };
+        }
+
+        /**
+         * 渲染结果到 UI
+         */
+        function displayResult(resultData) {
+            const { type, rawScores, maxScores } = resultData;
+            const resultInfo = MBTI_RESULTS[type] || { name: '未知类型', description: '未能找到匹配的类型描述。' };
+
+            document.getElementById('mbti-type').textContent = `${type} - ${resultInfo.name}`;
+            document.getElementById('mbti-description').textContent = resultInfo.description;
+
+            const analysisContainer = document.getElementById('dimension-analysis');
+            analysisContainer.innerHTML = '';
+
+            const dimensions = [
+                { category: 'E', opposite: 'I', name: '外向 vs 内向 (E/I)', max: maxScores['E'] },
+                { category: 'S', opposite: 'N', name: '实感 vs 直觉 (S/N)', max: maxScores['S'] },
+                { category: 'T', opposite: 'F', name: '思维 vs 情感 (T/F)', max: maxScores['T'] },
+                { category: 'J', opposite: 'P', name: '判断 vs 知觉 (J/P)', max: maxScores['J'] }
+            ];
+
+            dimensions.forEach(dim => {
+                const score = rawScores[dim.category];
+                // 倾向百分比：基于 E/S/T/J 的得分占满分的比例
+                const percentage = Math.round((score / dim.max) * 100); 
+                
+                const typeLetter = type.includes(dim.category) ? dim.category : dim.opposite;
+
+                // 计算显示百分比和颜色
+                let finalPct;
+                let side1Label;
+                let side2Label;
+
+                // 最终百分比 (倾向性)
+                if (typeLetter === dim.category) {
+                    // 倾向 E/S/T/J: E/S/T/J (percentage)% vs I/N/F/P (100-percentage)%
+                    finalPct = percentage;
+                    side1Label = dim.category;
+                    side2Label = dim.opposite;
+                } else {
+                    // 倾向 I/N/F/P: I/N/F/P (100-percentage)% vs E/S/T/J (percentage)%
+                    finalPct = 100 - percentage;
+                    side1Label = dim.opposite;
+                    side2Label = dim.category;
+                }
+                
+                // 保证倾向百分比不小于 50%
+                finalPct = Math.max(50, finalPct);
+                const barWidth = `${finalPct}%`;
+                const colorClass = (typeLetter === 'E' || typeLetter === 'S' || typeLetter === 'J') ? 'bg-blue-500' : 'bg-pink-500';
+                
+                analysisContainer.innerHTML += `
+                    <div class="border p-4 rounded-lg bg-gray-50">
+                        <p class="text-lg font-bold mb-2 text-gray-700">${dim.name}</p>
+                        <div class="flex justify-between text-sm font-medium mb-1">
+                            <span>${side1Label} (${finalPct}%)</span>
+                            <span>${side2Label} (${100 - finalPct}%)</span>
+                        </div>
+                        <div class="relative w-full h-3 bg-gray-200 rounded-full">
+                            <div class="absolute h-3 rounded-full ${colorClass}" style="width: ${barWidth};"></div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // 页面加载完成后，无需自动渲染问题，只需展示开始屏幕。
+        // window.onload = renderQuestions; // 旧函数已移除
+    </script>
+</body>
+</html>
